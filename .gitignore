@@ -1,0 +1,15 @@
+# C:\Users\Ashutosh Nigam\OneDrive\Desktop\supernova\.env
+# C:\Users\Ashutosh Nigam\OneDrive\Desktop\supernova\productService\.env
+# C:\Users\Ashutosh Nigam\OneDrive\Desktop\supernova\paymentService\.env
+# C:\Users\Ashutosh Nigam\OneDrive\Desktop\supernova\orderService\.env
+# C:\Users\Ashutosh Nigam\OneDrive\Desktop\supernova\cartService\.env
+# C:\Users\Ashutosh Nigam\OneDrive\Desktop\supernova\authService\.env
+# C:\Users\Ashutosh Nigam\OneDrive\Desktop\supernova\go.mod
+# C:\Users\Ashutosh Nigam\OneDrive\Desktop\supernova\go.sum
+
+
+*.env
+
+
+go.mod
+go.sum
