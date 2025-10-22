@@ -6,7 +6,7 @@ const searchProduct = tool(async ({ query, token }) => {
 
     console.log("searchProduct called with data:", { query, token })
 
-    const response = await axios.get(`http://nova-alb-551701734.ap-northeast-3.elb.amazonaws.com/api/products?q=${query}`, {
+    const response = await axios.get(`${process.env.PRODUCT_SERVICE_URL}/api/product/get?q=${query}`, {
         headers: {
             Authorization: `Bearer ${token}`
         }
@@ -24,27 +24,27 @@ const searchProduct = tool(async ({ query, token }) => {
 })
 
 
-const addProductToCart = tool(async ({ productId, qty = 1, token }) => {
+const addProductToCart = tool(async ({ productId, quantity = 1, token }) => {
 
 
-    const response = await axios.post(`http://nova-alb-551701734.ap-northeast-3.elb.amazonaws.com/api/cart/items`, {
+    const response = await axios.post(`${process.env.CART_SERVICE_URL}/api/cart/item`, {
         productId,
-        qty
+        quantity
     }, {
         headers: {
             Authorization: `Bearer ${token}`
         }
     })
 
-    return `Added product with id ${productId} (qty: ${qty}) to cart`
-
+    return `Added product with id ${productId} (qty: ${quantity}) to cart`
+ 
 
 }, {
     name: "addProductToCart",
     description: "Add a product to the shopping cart",
     schema: z.object({
         productId: z.string().describe("The id of the product to add to the cart"),
-        qty: z.number().describe("The quantity of the product to add to the cart").default(1),
+        quantity: z.number().describe("The quantity of the product to add to the cart").default(1),
     })
 })
 

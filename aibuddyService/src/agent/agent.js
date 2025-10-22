@@ -39,7 +39,7 @@ const graph = new StateGraph(MessagesAnnotation)
     })
     .addNode("chat", async (state, config) => {
         const response = await model.invoke(state.messages, { tools: [ tools.searchProduct, tools.addProductToCart ] })
-
+        
 
         state.messages.push(new AIMessage({ content: response.text, tool_calls: response.tool_calls }))
 

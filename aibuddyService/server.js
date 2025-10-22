@@ -10,6 +10,6 @@ const httpServer = http.createServer(app);
 initSocketServer(httpServer);
 
 
-httpServer.listen(3006, () => {
+httpServer.listen(8086, () => {
     console.log('AI Buddy service is running on port 3005');
-})
+}) 

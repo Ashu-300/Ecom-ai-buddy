@@ -2,6 +2,7 @@ package auth
 
 import (
 	"log"
+	"supernova/authService/auth/src/broker"
 	"supernova/authService/auth/src/db"
 	"supernova/authService/auth/src/routes"
 
@@ -19,6 +20,7 @@ func SetupAuthApp(router *gin.Engine) {
 	// Init DBs
 	db.InitDB()
 	db.InitRedisDB()
+	broker.ConnectBroker()
 	db.CreateUserIndexes(db.UserCollection)
 
 	// Setup router

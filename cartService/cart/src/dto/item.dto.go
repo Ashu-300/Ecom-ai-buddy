@@ -2,7 +2,7 @@ package dto
 
 type Item struct {
 	ProductID string 				`bson:"productId" json:"productId"`
-	Price     Price              	`bson:"price" json:"price"`
+	// Price     Price              	`bson:"price" json:"price"`
 	Quantity  int                	`bson:"quantity" json:"quantity" binding:"required,min=1"`
 }
 type Price struct {

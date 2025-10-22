@@ -12,7 +12,7 @@ type Order struct {
 	OrderID         primitive.ObjectID `json:"orderId" bson:"_id" binding:"required"`
 	UserID          primitive.ObjectID `json:"userId" bson:"userId" binding:"required"`
 	Items           []Item    	    	`json:"items" bson:"items" binding:"required"`
-	TotalAmount     float64            `json:"totalAmount" bson:"totalAmount" binding:"required"`
+	TotalPrice     	Price            	`json:"totalPrice" bson:"totalPrice" binding:"required"`
 	Status          OrderStatus        `json:"status" bson:"status"`
 	Address			Address    		   `json:"address" bson:"address" binding:"required"`
 	CreatedAt       time.Time          `json:"createdAt" bson:"createdAt" binding:"required"`

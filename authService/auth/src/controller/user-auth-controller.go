@@ -2,7 +2,10 @@ package controller
 
 import (
 	"context"
+	"encoding/json"
+	"log"
 	"net/http"
+	"supernova/authService/auth/src/broker"
 	"supernova/authService/auth/src/db"
 	"supernova/authService/auth/src/dto"
 	"supernova/authService/auth/src/jwtutils"
@@ -15,6 +18,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"golang.org/x/crypto/bcrypt"
 )
+type JsonUser struct {
+    Name  string `json:"name"`
+    Email string `json:"email"`
+}
+
 
 func Register(c *gin.Context) {
     var newUser models.User
@@ -56,6 +64,23 @@ func Register(c *gin.Context) {
 
         c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to register user."})
         return
+    }
+
+    jasonUser := JsonUser{
+        Name:  newUser.FirstName,
+        Email: newUser.Email,
+    }
+    body, err := json.Marshal(jasonUser)
+    if err != nil {
+        log.Printf("Failed to marshal user: %v", err)
+    }
+
+   
+
+    // Attempt to publish a message to the queue.
+    err = broker.PublishJSON("AuthService" , body)
+    if err != nil {
+        log.Print("Error in sending message to broaker" , err.Error())
     }
 
     c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully!"})
@@ -102,6 +127,10 @@ func Login(c *gin.Context) {
         })
         return
     }
+    
+
+       
+    
 
     // Login successful
     c.JSON(http.StatusOK, gin.H{

@@ -140,12 +140,13 @@ func CreateOrder(c *gin.Context) {
 	// ----------------------------------------------------
 
 	var totalAmount float64
+	currency := userCart.Items[0].Price.Currency
+	
 	orderItems := make([]ordermodel.Item, 0, len(userCart.Items)) // preallocate slice
 
 	for _, item := range userCart.Items {
 		// Calculate total
 		totalAmount += item.Price.Amount * float64(item.Quantity)
-
 		// Convert dto.Item → ordermodel.Item and append
 		orderItems = append(orderItems, ordermodel.Item{
 			ProductID: item.ProductID,
@@ -162,7 +163,10 @@ func CreateOrder(c *gin.Context) {
 	order.OrderID = primitive.NewObjectID()
 	order.UserID = userObjectID
 	order.Items = orderItems // Spread operator to convert slice types
-	order.TotalAmount = totalAmount
+	order.TotalPrice = ordermodel.Price{
+		Amount:totalAmount,
+		Currency: ordermodel.Currency(currency),
+	}
 	order.Status = ordermodel.StatusPending // Directly assign constant
 	order.Address = ordermodel.Address(address)
 	order.CreatedAt = time.Now()

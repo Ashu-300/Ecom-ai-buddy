@@ -1,6 +1,7 @@
 package main
 
 import (
+	// "supernova/aibuddyService/aibuddy"
 	"supernova/authService/auth"
 	"supernova/cartService/cart"
 	"supernova/orderService/order"
@@ -18,6 +19,7 @@ func main() {
 	product.SetupProductApp(router) // port 8083
 	order.SetupOrderApp(router) 	// port 8084
 	payment.SetupPaymentApp(router)	// port 8085
+	// aibuddy.SetUpAibuddyAPP(router)	// port 8086
 
 	router.Run(":8080")
 }

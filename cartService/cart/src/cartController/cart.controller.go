@@ -50,10 +50,6 @@ func AddItemToCart(c *gin.Context) {
 			newCart.Items = []cartmodel.Item{
 				{
 					productObjectID,
-					cartmodel.Price{
-						Amount:   item.Price.Amount,
-						Currency: cartmodel.Currency(item.Price.Currency),
-					},
 					item.Quantity,
 				},
 			}
