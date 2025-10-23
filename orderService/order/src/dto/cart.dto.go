@@ -38,7 +38,7 @@ type ResponseCart struct {
 
 type OrderData struct {
 	ReceiverMail string
-	OrderID      string
+	OrderID      primitive.ObjectID
 	TotalAmount  float64
 	Currency     ordermodel.Currency
 }

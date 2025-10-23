@@ -4,6 +4,7 @@ import (
 	"log"
 	"supernova/sellerDashboardService/sellerDashboard/src/broker"
 	"supernova/sellerDashboardService/sellerDashboard/src/db"
+	"supernova/sellerDashboardService/sellerDashboard/src/routes"
 
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -18,5 +19,6 @@ func SetupSellerDashboardApp(router *gin.Engine){
 	db.InitDB()
 	broker.Connect()
 	broker.ConsumeQueues()
+	routes.SellerRoutes(router)
 
 }

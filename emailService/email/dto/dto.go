@@ -26,7 +26,7 @@ type ProductData struct {
 
 type OrderData struct {
 	ReceiverMail string
-	OrderID      string
+	OrderID      primitive.ObjectID
 	TotalAmount  float64
 	Currency     string
 }

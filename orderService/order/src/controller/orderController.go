@@ -216,10 +216,12 @@ func CreateOrder(c *gin.Context) {
 	if err != nil {
 		log.Print("error: %v" , err.Error())
 	}
+	
+
 
 	orderData := dto.OrderData{
 		ReceiverMail: userEmailStr,
-		OrderID: result.InsertedID.(string),
+		OrderID: result.InsertedID.(primitive.ObjectID),
 		TotalAmount: totalAmount,
 		Currency: currency ,
 	}
