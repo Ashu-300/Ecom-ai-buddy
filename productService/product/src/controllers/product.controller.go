@@ -2,13 +2,16 @@ package controllers
 
 import (
 	"context"
+	"encoding/json"
+	"log"
 	"mime/multipart"
 	"net/http"
+	"strconv"
+	"supernova/productService/product/src/broker"
 	"supernova/productService/product/src/db"
 	"supernova/productService/product/src/dto"
 	"supernova/productService/product/src/models"
 	"supernova/productService/product/src/services"
-	"strconv"
 	"sync"
 	"time"
 
@@ -25,7 +28,12 @@ const fileFieldName = "images"
 // CreateProduct handles product creation and image upload to Cloudinary
 func CreateProduct(c *gin.Context) {
     var productDTO dto.ProductDTO
-    
+
+    userEmail , exists := c.Get("Email")
+    if !exists {
+        log.Print("email not found in product service")
+    }
+    userEmailStr := userEmail.(string)
     if err := c.ShouldBind(&productDTO); err != nil {
         c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
         return
@@ -143,11 +151,28 @@ func CreateProduct(c *gin.Context) {
 
      collection := db.GetProductCollection()
 
-	 _,err = collection.InsertOne(c, product)
+	 result , err := collection.InsertOne(c, product)
 	 if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create product"})
 		return
 	 }
+     productJson ,err := json.Marshal(&product)
+     if err != nil {
+        log.Print("err: %v",err.Error())
+     }
+     broker.PublishJSON("ProductDashboard" , productJson)
+     productData := dto.ProductData{
+        ReceiverMail: userEmailStr ,
+        ProductName: productDTO.Title,
+        ProductID: result.InsertedID.(primitive.ObjectID) ,
+        Price: product.Price.Amount,
+        Currency: productDTO.Price.Currency,
+     }
+     productDataJson ,err := json.Marshal(&productData)
+     if err != nil {
+        log.Print("err: %v",err.Error())
+     }
+     broker.PublishJSON("ProductCreated" , productDataJson)
 
     c.JSON(http.StatusOK, gin.H{
         "message": "Product created successfully",

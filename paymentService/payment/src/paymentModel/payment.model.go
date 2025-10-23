@@ -31,7 +31,7 @@ const (
 	USD Currency = "USD"
 )
 const (
-	StatusPending Status   = "PENDING"
-	StatusCompleted Status = "COMPLETED"
-	StatusFailed Status = "FAILED"
+	StatusPending Status   = "pending"
+	StatusCompleted Status = "completed"
+	StatusFailed Status = "failed"
 )

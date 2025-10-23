@@ -3,7 +3,7 @@ package cartcontroller
 import (
 	"context"
 	"net/http"
-	cartmodel "supernova/cartService/cart/src/cartModel"
+	"supernova/cartService/cart/src/cartModel"
 	"supernova/cartService/cart/src/db"
 	"supernova/cartService/cart/src/dto"
 	"time"
@@ -50,6 +50,7 @@ func AddItemToCart(c *gin.Context) {
 			newCart.Items = []cartmodel.Item{
 				{
 					productObjectID,
+					item.Price,
 					item.Quantity,
 				},
 			}

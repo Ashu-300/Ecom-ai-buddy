@@ -6,195 +6,121 @@ import (
 	"sync"
 	"time"
 
+	
+
 	"github.com/streadway/amqp"
 )
 
 var (
-	conn         *amqp.Connection
-	channel      *amqp.Channel
-	notifyClose  chan *amqp.Error
-	mutex        sync.Mutex
-	amqpURL      string
+	conn        *amqp.Connection
+	channel     *amqp.Channel
+	notifyClose chan *amqp.Error
+	mutex       sync.Mutex
+	amqpURL     string
 	retryBackoff = 5 * time.Second
 )
 
-// ConnectBroker establishes connection and channel to RabbitMQ and declares the durable queue.
-// It is safe to call multiple times (uses a mutex).
-func ConnectBroker() {
+var queues = []string{"AuthService", "PaymentService", "AuthServiceDashboard" , "ProductDashboard" , "OrderDashboard" }
+
+// Connect initializes RabbitMQ connection and channel (idempotent)
+func Connect() {
 	mutex.Lock()
 	defer mutex.Unlock()
 
-	// read AMQP url once
 	if amqpURL == "" {
 		amqpURL = os.Getenv("AMQP_SERVER_URL")
 		if amqpURL == "" {
-			log.Fatal("AMQP_SERVER_URL is not set")
+			log.Fatal("❌ sellerDashboard AMQP_SERVER_URL not set")
 		}
-	}
-
-	// If already connected and channel seems fine, just return
-	if conn != nil && channel != nil {
-		return
 	}
 
 	for {
 		var err error
-		log.Println("🔁 Attempting to connect to RabbitMQ...")
+		log.Println("🔁 sellerDashboard service Connecting to RabbitMQ...")
 		conn, err = amqp.Dial(amqpURL)
 		if err != nil {
-			log.Println("⚠️  Failed to connect to RabbitMQ:", err)
+			log.Println("⚠️ sellerDashboard Failed to connect:", err)
 			time.Sleep(retryBackoff)
 			continue
 		}
 
 		channel, err = conn.Channel()
 		if err != nil {
-			log.Println("⚠️  Failed to open channel:", err)
+			log.Println("⚠️ sellerDashboard Failed to open channel:", err)
 			_ = conn.Close()
-			conn = nil
 			time.Sleep(retryBackoff)
 			continue
 		}
 
-		// Declare a durable queue (idempotent; safe to declare from both producer and consumer)
-		_, err = channel.QueueDeclare(
-			"PaymentService", // queue name
-			true,          // durable
-			false,         // auto-delete
-			false,         // exclusive
-			false,         // no-wait
-			nil,           // args
-		)
-		if err != nil {
-			log.Println("⚠️  Failed to declare queue:", err)
-			_ = channel.Close()
-			_ = conn.Close()
-			channel = nil
-			conn = nil
-			time.Sleep(retryBackoff)
-			continue
-		}
-
-		// Enable publisher confirms - best-effort
-		if err := channel.Confirm(false); err != nil {
-			log.Println("⚠️  Could not put channel into confirm mode:", err)
-			// not fatal; we continue
-		}
-
-		// Setup NotifyClose to detect unexpected channel/connection closures
 		notifyClose = make(chan *amqp.Error)
 		channel.NotifyClose(notifyClose)
 
-		// Launch a goroutine to handle closures and attempt reconnect
-		go func(nc chan *amqp.Error) {
-			err := <-nc
-			if err != nil {
-				log.Printf("🚨 RabbitMQ channel closed: %v. Will attempt reconnect...\n", err)
-			} else {
-				log.Println("ℹ️ RabbitMQ NotifyClose returned nil error (channel closed). Reconnecting...")
-			}
-			// Clean up existing references; next publish will call ConnectBroker again
-			mutex.Lock()
-			if channel != nil {
-				_ = channel.Close()
-			}
-			if conn != nil {
-				_ = conn.Close()
-			}
-			channel = nil
-			conn = nil
-			mutex.Unlock()
+		// Launch reconnect handler in background
+		go handleReconnect(notifyClose)
 
-			// Try to reconnect in background (non-blocking)
-			for {
-				ConnectBroker()
-				// if connection succeeded, break
-				mutex.Lock()
-				ok := (conn != nil && channel != nil)
-				mutex.Unlock()
-				if ok {
-					log.Println("✅ Reconnected to RabbitMQ (background)")
-					return
-				}
-				time.Sleep(retryBackoff)
-			}
-		}(notifyClose)
-
-		log.Println("✅ Successfully connected to RabbitMQ (Producer)")
+		log.Println("✅ sellerDashboard service  Connected to RabbitMQ")
 		return
 	}
 }
 
-// PublishJSON sends a persistent JSON message to the specified queue.
-// On failure it attempts a reconnect and retries once.
-func PublishJSON(queueName string, body []byte) error {
-	// Ensure we have a connection & channel
-	if conn == nil || channel == nil {
-		ConnectBroker()
+func handleReconnect(nc chan *amqp.Error) {
+	err := <-nc
+	if err != nil {
+		log.Printf("🚨 sellerDashboard RabbitMQ closed: %v. Reconnecting...", err)
+	} else {
+		log.Println("ℹ️ sellerDashboard RabbitMQ NotifyClose returned nil. Reconnecting...")
 	}
 
-	// mutex to avoid racing ConnectBroker from NotifyClose goroutine
+	mutex.Lock()
+	if channel != nil {
+		_ = channel.Close()
+	}
+	if conn != nil {
+		_ = conn.Close()
+	}
+	channel, conn = nil, nil
+	mutex.Unlock()
+
+	// reconnect in background
+	for {
+		Connect()
+		mutex.Lock()
+		ok := conn != nil && channel != nil
+		mutex.Unlock()
+		if ok {
+			log.Println("✅ sellerDashboard Reconnected to RabbitMQ (background)")
+			return
+		}
+		time.Sleep(retryBackoff)
+	}
+}
+
+// PublishJSON sends a persistent JSON message to a queue
+func PublishJSON(queueName string, body []byte) error {
+	if conn == nil || channel == nil {
+		Connect()
+	}
+
 	mutex.Lock()
 	ch := channel
 	mutex.Unlock()
-
 	if ch == nil {
-		// if still nil after ConnectBroker, return an error
 		return amqp.ErrClosed
 	}
-
-	// publish attempt
-	err := ch.Publish(
-		"",        // exchange
-		queueName, // routing key
-		false,     // mandatory
-		false,     // immediate
-		amqp.Publishing{
-			ContentType:  "application/json",
-			Body:         body,
-			DeliveryMode: amqp.Persistent, // persistent messages
-			Timestamp:    time.Now(),
-		},
+	_, err := ch.QueueDeclare(
+		queueName,  // queue name
+		true,       // durable
+		false,      // auto-delete
+		false,      // exclusive
+		false,      // no-wait
+		nil,        // arguments
 	)
-	if err == nil {
-		// attempt to wait for confirm (if channel was put into confirm mode)
-		ackCh := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
-		select {
-		case conf := <-ackCh:
-			if conf.Ack {
-				log.Printf("📤 Sent message to %s: %s", queueName, string(body))
-				return nil
-			}
-			log.Println("❌ Message not acknowledged by broker")
-			// fallthrough to retry logic
-		case <-time.After(5 * time.Second):
-			// confirmation timeout - treat as possible failure but do not block forever
-			log.Println("⚠️ Timeout waiting for broker confirmation (continuing)")
-			// We still treat publish as success because Publish didn't return an error.
-			log.Printf("📤 Sent (no confirm) message to %s: %s", queueName, string(body))
-			return nil
-		}
-	} else {
-		log.Println("❌ Failed to publish (first attempt):", err)
-	}
-
-	// If we reached here -> first publish failed or not acked. Try reconnect + retry once.
-	log.Println("🔁 Attempting reconnect and single retry...")
-	ConnectBroker()
-
-	// get fresh channel
-	mutex.Lock()
-	ch = channel
-	mutex.Unlock()
-	if ch == nil {
-		return amqp.ErrClosed
+	if err != nil {
+		return err
 	}
 
 	err = ch.Publish(
-		"",        // exchange
-		queueName, // routing key
-		false,
-		false,
+		"", queueName, false, false,
 		amqp.Publishing{
 			ContentType:  "application/json",
 			Body:         body,
@@ -203,30 +129,92 @@ func PublishJSON(queueName string, body []byte) error {
 		},
 	)
 	if err != nil {
-		log.Println("🚨 Retry publish failed:", err)
-		return err
+		log.Println("❌ sellerDashboard Publish failed, reconnecting...")
+		Connect()
+		mutex.Lock()
+		ch = channel
+		mutex.Unlock()
+		if ch == nil {
+			return amqp.ErrClosed
+		}
+		return ch.Publish(
+			"", queueName, false, false,
+			amqp.Publishing{
+				ContentType:  "application/json",
+				Body:         body,
+				DeliveryMode: amqp.Persistent,
+				Timestamp:    time.Now(),
+			},
+		)
 	}
 
-	// attempt confirm again (best-effort)
-	ackCh := ch.NotifyPublish(make(chan amqp.Confirmation, 1))
-	select {
-	case conf := <-ackCh:
-		if conf.Ack {
-			log.Printf("📤 Sent message to %s (after retry): %s", queueName, string(body))
-			return nil
-		}
-		log.Println("❌ Message not acknowledged by broker (after retry)")
-		return amqp.ErrClosed
-	case <-time.After(5 * time.Second):
-		log.Println("⚠️ Timeout waiting for broker confirmation (after retry). Treating as success.")
-		log.Printf("📤 Sent (no confirm) message to %s (after retry): %s", queueName, string(body))
-		return nil
-	}
+	log.Printf("📤 sellerDashboard Sent message to %s", queueName)
+	return nil
 }
 
-// GetChannel returns the active AMQP channel (may be nil)
+// ConsumeQueues sets up consumers for multiple queues
+// func ConsumeQueues() {
+// 	if conn == nil || channel == nil {
+// 		Connect()
+// 	}
+
+// 	for _, q := range queues {
+// 		_, err := channel.QueueDeclare(q, true, false, false, false, nil)
+// 		if err != nil {
+// 			log.Fatalf("❌ sellerDashboard Failed to declare queue %s: %v", q, err)
+// 		}
+
+// 		msgs, err := channel.Consume(q, "", false, false, false, false, nil)
+// 		if err != nil {
+// 			log.Fatalf("❌ sellerDashboard Failed to consume queue %s: %v", q, err)
+// 		}
+
+// 		go func(queue string, msgs <-chan amqp.Delivery) {
+// 			for msg := range msgs {
+// 				handleMessage(queue, msg)
+// 			}
+// 		}(q, msgs)
+// 	}
+// 	log.Println("✅ sellerdashboard Consumers started for queues:", queues)
+// }
+
+// func handleMessage(queue string, msg amqp.Delivery) {
+// 	switch queue {
+// 	case "AuthService":
+// 		var user dto.JsonUser
+// 		_ = json.Unmarshal(msg.Body, &user)
+// 		// controller.AuthEmail(user.Email, user.Name)
+// 	case "PaymentService":
+// 		var data dto.PaymentData
+// 		_ = json.Unmarshal(msg.Body, &data)
+// 		// controller.PaymentSuccessEmail(data)
+// 	case "AuthServiceDashboard":
+// 		var user models.User
+// 		_ = json.Unmarshal(msg.Body, &user)
+// 		 controller.CreateUser(user)
+// 	case "ProductDashboard":
+// 		var product models.Product
+// 		_ = json.Unmarshal(msg.Body , &product)
+// 		controller.CreateProduct(product)
+// 	case "OrderDashboard":
+// 		var order models.Order
+// 		_ = json.Unmarshal(msg.Body , &order)
+// 		controller.CreateOrder(order)
+
+// 	}
+// 	msg.Ack(false)
+// }
+
+// GetChannel returns current channel
 func GetChannel() *amqp.Channel {
 	mutex.Lock()
 	defer mutex.Unlock()
 	return channel
+}
+
+// GetConnection returns current connection
+func GetConnection() *amqp.Connection {
+	mutex.Lock()
+	defer mutex.Unlock()
+	return conn
 }

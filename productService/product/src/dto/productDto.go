@@ -1,7 +1,9 @@
 package dto
 
 import (
-    "mime/multipart"
+	"mime/multipart"
+
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // PriceDTO for receiving price info
@@ -23,4 +25,13 @@ type ProductDTO struct {
     Images      []*multipart.FileHeader `form:"images" binding:"required"`
     Stock       int          `form:"stock" binding:"required,gte=0"`
     // SellerID    string       `form:"seller_id" binding:"required"`
+}
+
+
+type ProductData struct {
+    ReceiverMail string			`json:"receiverMail"`
+    ProductName  string			`json:"receiverMail"`
+    ProductID    primitive.ObjectID		`json:"receiverMail"`
+    Price        float64		`json:"receiverMail"`
+    Currency     string			`json:"receiverMail"`
 }

@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"net/http"
 	"os"
+	"supernova/orderService/order/src/broker"
 	"supernova/orderService/order/src/db"
 	"supernova/orderService/order/src/dto"
 	"supernova/orderService/order/src/orderModel"
@@ -28,6 +30,13 @@ func CreateOrder(c *gin.Context) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in context"})
 		return
 	}
+
+	userEmail, exists := c.Get("Email")
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: User ID not found in context"})
+		return
+	}
+	userEmailStr := userEmail.(string)
 
 	userObjectID, err := primitive.ObjectIDFromHex(userID.(string))
 	if err != nil {
@@ -165,7 +174,7 @@ func CreateOrder(c *gin.Context) {
 	order.Items = orderItems // Spread operator to convert slice types
 	order.TotalPrice = ordermodel.Price{
 		Amount:totalAmount,
-		Currency: ordermodel.Currency(currency),
+		Currency: currency,
 	}
 	order.Status = ordermodel.StatusPending // Directly assign constant
 	order.Address = ordermodel.Address(address)
@@ -198,6 +207,31 @@ func CreateOrder(c *gin.Context) {
 		return
 	}
 	defer cartClearResp.Body.Close()
+
+	orderJson ,err := json.Marshal(&order)
+	if err != nil {
+		log.Print("error: %v" , err.Error())
+	}
+	err  = broker.PublishJSON("OrderDashboard" , orderJson)
+	if err != nil {
+		log.Print("error: %v" , err.Error())
+	}
+
+	orderData := dto.OrderData{
+		ReceiverMail: userEmailStr,
+		OrderID: result.InsertedID.(string),
+		TotalAmount: totalAmount,
+		Currency: currency ,
+	}
+	orderDataJson ,err := json.Marshal(&orderData)
+	if err != nil {
+		log.Print("error: %v" , err.Error())
+	}
+
+	err = broker.PublishJSON("OrderCreated" , orderDataJson)
+	if err != nil {
+		log.Print("error: %v" , err.Error())
+	}
 
 	// Final success response
 	c.JSON(http.StatusCreated, gin.H{

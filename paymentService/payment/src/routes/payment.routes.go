@@ -13,4 +13,5 @@ func PaymentRoutes(router *gin.Engine){
 	securedRoutes := r.Use(middleware.CreateAuthMiddleware())
 
 	securedRoutes.POST("/create/:orderID" , controller.CreatePayment)
+	securedRoutes.POST("/verify/:paymentID" , controller.VerifyPayment)
 }

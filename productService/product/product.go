@@ -2,6 +2,7 @@ package product
 
 import (
 	"log"
+	"supernova/productService/product/src/broker"
 	"supernova/productService/product/src/db"
 	"supernova/productService/product/src/routes"
 	"supernova/productService/product/src/services"
@@ -17,6 +18,8 @@ func SetupProductApp(router *gin.Engine) {
 
 	db.InItDB()
 	services.CloudinaryInit()
+	broker.Connect()
+	
 	routes.ProductRoutes(router)
 }
 

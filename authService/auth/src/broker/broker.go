@@ -39,17 +39,17 @@ func ConnectBroker() {
 
 	for {
 		var err error
-		log.Println("🔁 Attempting to connect to RabbitMQ...")
+		log.Println("🔁 authService Attempting to connect to RabbitMQ...")
 		conn, err = amqp.Dial(amqpURL)
 		if err != nil {
-			log.Println("⚠️  Failed to connect to RabbitMQ:", err)
+			log.Println("⚠️ authService Failed to connect to RabbitMQ:", err)
 			time.Sleep(retryBackoff)
 			continue
 		}
 
 		channel, err = conn.Channel()
 		if err != nil {
-			log.Println("⚠️  Failed to open channel:", err)
+			log.Println("⚠️ authService Failed to open channel:", err)
 			_ = conn.Close()
 			conn = nil
 			time.Sleep(retryBackoff)
@@ -66,7 +66,7 @@ func ConnectBroker() {
 			nil,           // args
 		)
 		if err != nil {
-			log.Println("⚠️  Failed to declare queue:", err)
+			log.Println("⚠️ authService Failed to declare queue:", err)
 			_ = channel.Close()
 			_ = conn.Close()
 			channel = nil
@@ -77,7 +77,7 @@ func ConnectBroker() {
 
 		// Enable publisher confirms - best-effort
 		if err := channel.Confirm(false); err != nil {
-			log.Println("⚠️  Could not put channel into confirm mode:", err)
+			log.Println("⚠️ authService  Could not put channel into confirm mode:", err)
 			// not fatal; we continue
 		}
 
@@ -89,9 +89,9 @@ func ConnectBroker() {
 		go func(nc chan *amqp.Error) {
 			err := <-nc
 			if err != nil {
-				log.Printf("🚨 RabbitMQ channel closed: %v. Will attempt reconnect...\n", err)
+				log.Printf("🚨 authService RabbitMQ channel closed: %v. Will attempt reconnect...\n", err)
 			} else {
-				log.Println("ℹ️ RabbitMQ NotifyClose returned nil error (channel closed). Reconnecting...")
+				log.Println("ℹ️ authService RabbitMQ NotifyClose returned nil error (channel closed). Reconnecting...")
 			}
 			// Clean up existing references; next publish will call ConnectBroker again
 			mutex.Lock()
@@ -113,14 +113,14 @@ func ConnectBroker() {
 				ok := (conn != nil && channel != nil)
 				mutex.Unlock()
 				if ok {
-					log.Println("✅ Reconnected to RabbitMQ (background)")
+					log.Println("✅ authService Reconnected to RabbitMQ (background)")
 					return
 				}
 				time.Sleep(retryBackoff)
 			}
 		}(notifyClose)
 
-		log.Println("✅ Successfully connected to RabbitMQ (Producer)")
+		log.Println("✅ authService Successfully connected to RabbitMQ (Producer)")
 		return
 	}
 }
@@ -142,9 +142,20 @@ func PublishJSON(queueName string, body []byte) error {
 		// if still nil after ConnectBroker, return an error
 		return amqp.ErrClosed
 	}
+	_, err := ch.QueueDeclare(
+		queueName,  // queue name
+		true,       // durable
+		false,      // auto-delete
+		false,      // exclusive
+		false,      // no-wait
+		nil,        // arguments
+	)
+	if err != nil {
+		return err
+	}
 
 	// publish attempt
-	err := ch.Publish(
+	err = ch.Publish(
 		"",        // exchange
 		queueName, // routing key
 		false,     // mandatory
@@ -162,24 +173,24 @@ func PublishJSON(queueName string, body []byte) error {
 		select {
 		case conf := <-ackCh:
 			if conf.Ack {
-				log.Printf("📤 Sent message to %s: %s", queueName, string(body))
+				log.Printf("📤 authService Sent message to %s: %s", queueName, string(body))
 				return nil
 			}
-			log.Println("❌ Message not acknowledged by broker")
+			log.Println("❌ authService Message not acknowledged by broker")
 			// fallthrough to retry logic
 		case <-time.After(5 * time.Second):
 			// confirmation timeout - treat as possible failure but do not block forever
-			log.Println("⚠️ Timeout waiting for broker confirmation (continuing)")
+			log.Println("⚠️ authService Timeout waiting for broker confirmation (continuing)")
 			// We still treat publish as success because Publish didn't return an error.
-			log.Printf("📤 Sent (no confirm) message to %s: %s", queueName, string(body))
+			log.Printf("📤 authService Sent (no confirm) message to %s: %s", queueName, string(body))
 			return nil
 		}
 	} else {
-		log.Println("❌ Failed to publish (first attempt):", err)
+		log.Println("❌ authService Failed to publish (first attempt):", err)
 	}
 
 	// If we reached here -> first publish failed or not acked. Try reconnect + retry once.
-	log.Println("🔁 Attempting reconnect and single retry...")
+	log.Println("🔁 authService Attempting reconnect and single retry...")
 	ConnectBroker()
 
 	// get fresh channel
@@ -189,6 +200,7 @@ func PublishJSON(queueName string, body []byte) error {
 	if ch == nil {
 		return amqp.ErrClosed
 	}
+	
 
 	err = ch.Publish(
 		"",        // exchange
@@ -203,7 +215,7 @@ func PublishJSON(queueName string, body []byte) error {
 		},
 	)
 	if err != nil {
-		log.Println("🚨 Retry publish failed:", err)
+		log.Println("🚨 authService Retry publish failed:", err)
 		return err
 	}
 
@@ -212,13 +224,13 @@ func PublishJSON(queueName string, body []byte) error {
 	select {
 	case conf := <-ackCh:
 		if conf.Ack {
-			log.Printf("📤 Sent message to %s (after retry): %s", queueName, string(body))
+			log.Printf("📤 authService Sent message to %s (after retry): %s", queueName, string(body))
 			return nil
 		}
-		log.Println("❌ Message not acknowledged by broker (after retry)")
+		log.Println("❌ authService Message not acknowledged by broker (after retry)")
 		return amqp.ErrClosed
 	case <-time.After(5 * time.Second):
-		log.Println("⚠️ Timeout waiting for broker confirmation (after retry). Treating as success.")
+		log.Println("⚠️ authService Timeout waiting for broker confirmation (after retry). Treating as success.")
 		log.Printf("📤 Sent (no confirm) message to %s (after retry): %s", queueName, string(body))
 		return nil
 	}

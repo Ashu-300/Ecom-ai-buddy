@@ -70,18 +70,36 @@ func Register(c *gin.Context) {
         Name:  newUser.FirstName,
         Email: newUser.Email,
     }
-    body, err := json.Marshal(jasonUser)
-    if err != nil {
-        log.Printf("Failed to marshal user: %v", err)
-    }
 
-   
+    // Run first publishing in a goroutine
+    go func() {
+        body, err := json.Marshal(jasonUser)
+        if err != nil {
+            log.Printf("❌ Failed to marshal user: %v", err)
+            return
+        }
 
-    // Attempt to publish a message to the queue.
-    err = broker.PublishJSON("AuthService" , body)
-    if err != nil {
-        log.Print("Error in sending message to broaker" , err.Error())
-    }
+        if err := broker.PublishJSON("AuthService", body); err != nil {
+            log.Printf("❌ Error sending message to broker (AuthService): %v", err)
+        } else {
+            log.Println("✅ Message sent to AuthService queue")
+        }
+    }()
+
+    // Run second publishing in another goroutine
+    go func() {
+        userData, err := json.Marshal(newUser)
+        if err != nil {
+            log.Printf("❌ Failed to marshal newUser: %v", err)
+            return
+        }
+
+        if err := broker.PublishJSON("AuthServiceDashboard", userData); err != nil {
+            log.Printf("❌ Error sending message to broker (AuthServiceDashboard): %v", err)
+        } else {
+            log.Println("✅ Message sent to AuthServiceDashboard queue")
+        }
+    }()
 
     c.JSON(http.StatusCreated, gin.H{"message": "User registered successfully!"})
 }

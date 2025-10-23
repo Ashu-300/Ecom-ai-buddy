@@ -1,6 +1,7 @@
 package payment
 
 import (
+	"supernova/paymentService/payment/src/broker"
 	"supernova/paymentService/payment/src/db"
 	"supernova/paymentService/payment/src/routes"
 
@@ -15,6 +16,7 @@ func SetupPaymentApp(router *gin.Engine) {
 	}
 
 	db.InitDB()
+	broker.Connect()
 
 	routes.PaymentRoutes(router)
 
