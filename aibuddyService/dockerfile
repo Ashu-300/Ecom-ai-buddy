@@ -1,19 +1,36 @@
-FROM node:18-alpine
+# -------------------------------------
+# Stage 1: Dependency Installation (Builder)
+# -------------------------------------
+FROM node:18-alpine AS builder
 
+# Set the working directory inside the container
+WORKDIR /app
+
+
+COPY ./aibuddyService/package*.json ./
+
+COPY /aibuddyService/.env /app/.env
+
+
+# 2. Install dependencies. This runs inside /app, finds package.json, and creates node_modules here.
+RUN npm install
+
+# -------------------------------------
+# Stage 2: Final Image (Production)
+# -------------------------------------
+FROM node:18-alpine
 
 WORKDIR /app
 
 
-COPY package*.json ./
+COPY --from=builder /app/node_modules ./node_modules
 
+COPY aibuddyService/. ./
 
-RUN npm install
-
-COPY . .
-
-COPY .env .env
+COPY --from=builder /app/.env /.env
 
 EXPOSE 8086
 
-
+# Start the application
 CMD ["npm", "start"]
+

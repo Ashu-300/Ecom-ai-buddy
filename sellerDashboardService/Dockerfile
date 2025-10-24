@@ -1,40 +1,41 @@
+
 # --- Stage 1: Builder ---
 FROM golang:1.25-alpine AS builder
 
-ENV CGO_ENABLED=1
-ENV GOOS=linux
+
 WORKDIR /app
 
-# 1. Copy go.mod and go.sum from the build context root (which is the main project root)
-# The source path is relative to the directory where the 'docker build' command is executed.
-# Since we execute from the root, 'go.mod' refers to the file at the root.
+
+
+# 1. Copy go.mod and go.sum from the build context root
 COPY go.mod go.sum ./
 
 # Download dependencies
 RUN go mod download
 
 # 2. Copy the entire service directory into the container
-# Since we execute from the project root, 'authService' is a valid directory path.
-# Change 'authService' to 'cartService', 'orderService', etc., for the other service Dockerfiles.
-# The destination is /app/authService
+# REPLACE sellerDashboardService with the actual name (e.g., cartService)
 COPY sellerDashboardService/ sellerDashboardService/
 
-COPY .env .env
+# 3. Copy environment file 
+COPY sellerDashboardService/.env sellerDashboardService/.env
+
+# 4. Build the Go application
+# REPLACE sellerDashboardService and BINARY_NAME
+RUN go build -o /app/sellerdashboard ./sellerDashboardService/main.go
 
 
-# 3. Build the Go application, specifying the path to the service's main.go
-# This builds the binary for the specific service only.
-RUN go build -o /app ./sellerDashboardService/main.go
+# --- Stage 2: Final Image (Production) ---
+FROM alpine:latest
 
 
-# --- Stage 2: Final Image ---
-FROM scratch
 
-# IMPORTANT: CHANGE THIS PORT (e.g., 8081 for auth, 8082 for cart, etc.)
-EXPOSE 8086
+# EXPOSE the specific port for this service
+EXPOSE 8088
 
-# Copy the compiled binary
-COPY --from=builder /app /app
+# Copy the compiled binary and the .env file
+COPY --from=builder /app/sellerdashboard /sellerdashboard
+COPY --from=builder /app/sellerDashboardService/.env ./.env
 
 # Run the application
-ENTRYPOINT ["/app"]
+ENTRYPOINT ["/sellerdashboard"]

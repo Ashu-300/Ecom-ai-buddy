@@ -19,6 +19,20 @@ services:
       - email
       - seller-dashboard
       - aibuddy
+      # If the monolith is also an option, uncomment and add it here:
+      # - supernova-monolith
+
+  # -------------------- MONOLITH SERVICE (NEW) --------------------
+  supernova-monolith:
+    image: ashutoshnigam300/monolith:latest
+    container_name: monolith
+    # The build context is the root directory (.), and it uses the Dockerfile
+    # located directly in the root, which you confirmed you have.
+    build:
+      context: .
+      dockerfile: Dockerfile 
+    ports:
+      - "8080:8080" # Use a distinct port, e.g., 8090
 
   # -------------------- Auth Service --------------------
   auth:
