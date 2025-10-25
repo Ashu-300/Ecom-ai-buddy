@@ -1,0 +1,36 @@
+groups:
+  - name: monolith.scaling.alerts
+    rules:
+      # --- Rule 1: High Latency Alert (Trigger Scale-Out Action) ---
+      - alert: MonolithHighLatencyAlert
+        # Check if the 95th percentile latency (P95) for the monolith-app job
+        # has been greater than 1 second for 2 minutes.
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket{job="monolith-app"}[1m])) by (le)
+          ) > 1
+        for: 2m
+        labels:
+          severity: warning
+          # CRITICAL: This label is used by Alertmanager to route this alert to Jenkins for deployment
+          jenkins_action: deploy_microservice 
+        annotations:
+          summary: "Monolith Latency Exceeds Scaling Threshold (P95 > 1s)"
+          description: "The 95th percentile request latency for the Monolith service has exceeded 1 second for 2 minutes. This triggers the auxiliary microservice deployment via Jenkins to offload the high-latency tasks."
+
+      # --- Rule 2: Low Latency Alert (Trigger Scale-In/Cleanup Action) ---
+      - alert: MonolithLowLatencyAlert
+        # Check if the 95th percentile latency (P95) has been safely below 0.5 seconds
+        # for a stable period of 10 minutes, indicating reduced load.
+        expr: |
+          histogram_quantile(0.95, 
+            sum(rate(http_request_duration_seconds_bucket{job="monolith-app"}[5m])) by (le)
+          ) < 0.5
+        for: 10m
+        labels:
+          severity: info
+          # CRITICAL: This label is used by Alertmanager to route this alert to Jenkins for removal
+          jenkins_action: remove_microservice
+        annotations:
+          summary: "Monolith Latency Safe for Scale Down (P95 < 0.5s)"
+          description: "The 95th percentile request latency has been stable below 0.5 seconds for 10 minutes. This triggers the removal of the auxiliary microservice deployment via Jenkins, completing the scale-in process."

@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
+
+# Define what Prometheus will monitor
+# Define what Prometheus will monitor
+scrape_configs:
+  - job_name: 'monolith-app'
+    # Use the Kubernetes service discovery mechanism for better integration
+    # or a simple static config using the service name.
+    
+    # 1. Using static_configs (Simplest, works if Prometheus is in the same namespace)
+    static_configs:
+      - targets: ['monolith:8080'] # Use the service name (monolith) and its internal port (8080)
+    
+    metrics_path: /metrics
+    scheme: http
+
+# Optional: monitor Kubernetes components too
+# - job_name: 'kubernetes-apiservers'
+#   kubernetes_sd_configs:
+#     - role: endpoints
