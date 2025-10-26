@@ -1,0 +1,58 @@
+# groups:
+#   - name: monolith-alerts
+#     rules:
+#       # 🔴 High Latency Alert
+#       - alert: MonolithHighLatency
+#         expr: rate(gin_request_duration_seconds_sum[1m]) / rate(gin_request_duration_seconds_count[1m]) > 4
+#         for: 1m
+#         labels:
+#           severity: warning
+#           action: scale-up
+#         annotations:
+#           summary: "High latency in Monolith"
+#           description: "Average latency > 2s for more than 1 minute"
+
+#       # 🟢 Low Latency (Recovered) Alert
+#       - alert: MonolithLatencyRecovered
+#         expr: rate(gin_request_duration_seconds_sum[1m]) / rate(gin_request_duration_seconds_count[1m]) < 1
+#         for: 2m
+#         labels:
+#           severity: info
+#           action: scale-down
+#         annotations:
+#           summary: "Latency back to normal in Monolith"
+#           description: "Average latency < 1s for more than 2 minutes"
+
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: monolith-alert-rules
+  namespace: default
+  labels:
+    release: prometheus-stack
+spec:
+  groups:
+    - name: monolith-latency
+      rules:
+        # 🔴 High Latency
+        - alert: MonolithHighLatency
+          expr: rate(gin_request_duration_seconds_sum[1m]) / rate(gin_request_duration_seconds_count[1m]) > 4
+          for: 1m
+          labels:
+            severity: warning
+            action: scale-up
+          annotations:
+            summary: "High latency in Monolith"
+            description: "Average latency > 4s for more than 1 minute"
+
+        # 🟢 Low Latency (Recovered)
+        - alert: MonolithLatencyRecovered
+          expr: rate(gin_request_duration_seconds_sum[1m]) / rate(gin_request_duration_seconds_count[1m]) < 1
+          for: 2m
+          labels:
+            severity: info
+            action: scale-down
+          annotations:
+            summary: "Latency back to normal in Monolith"
+            description: "Average latency < 1s for more than 2 minutes"

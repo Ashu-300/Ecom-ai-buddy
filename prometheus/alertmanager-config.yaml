@@ -1,0 +1,41 @@
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: monolith-alertmanager-config
+  namespace: default
+  labels:
+    release: prometheus-stack
+spec:
+  route:
+    receiver: default-receiver   # <--- must be set at root
+    groupBy: ['alertname']
+    groupWait: 10s
+    groupInterval: 30s
+    repeatInterval: 2m
+    routes:
+      - matchers:
+          - name: alertname
+            value: MonolithHighLatency
+            matchType: =
+        receiver: scale-up
+      - matchers:
+          - name: alertname
+            value: MonolithLatencyRecovered
+            matchType: =
+        receiver: scale-down
+
+  receivers:
+    - name: default-receiver
+      webhookConfigs:
+        - url: "http://monolith-service.default.svc:8080/scale"
+          sendResolved: true
+
+    - name: scale-up
+      webhookConfigs:
+        - url: "http://monolith-service.default.svc:8080/scale?replicas=3"
+          sendResolved: true
+
+    - name: scale-down
+      webhookConfigs:
+        - url: "http://monolith-service.default.svc:8080/scale?replicas=1"
+          sendResolved: true

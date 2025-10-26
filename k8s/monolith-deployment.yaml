@@ -22,13 +22,20 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: monolith
+  name: monolith-service
+  labels:
+    app: monolith
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8080"
+    prometheus.io/path: "/metrics"
 spec:
   selector:
     app: monolith
   type: NodePort
   ports:
-    - protocol: TCP
+    - name: http
+      protocol: TCP
       port: 8080        # Internal cluster port
       targetPort: 8080  # Container port
       nodePort: 30080

@@ -10,10 +10,15 @@ import (
 	"supernova/sellerDashboardService/sellerDashboard"
 
 	"github.com/gin-gonic/gin"
+	ginprometheus "github.com/zsais/go-gin-prometheus"
 )
 
 func main() {
 	router := gin.Default()
+
+	prom := ginprometheus.NewPrometheus("gin")
+	prom.Use(router)
+
 
 	auth.SetupAuthApp(router)     					// port 8081
 	cart.SetupCartApp(router) 						// port 8082

@@ -1,0 +1,40 @@
+# apiVersion: monitoring.coreos.com/v1
+# kind: ServiceMonitor
+# metadata:
+#   name: monolith-servicemonitor
+#   namespace: default
+#   labels:
+#     release: prometheus-stack   # match your Prometheus Operator release
+# spec:
+#   selector:
+#     matchLabels:
+#       app: monolith
+#   endpoints:
+#     - port: http          # must match the name in your Service
+#       path: /metrics
+#       interval: 15s
+#       scheme: http
+#   namespaceSelector:
+#     matchNames:
+#       - default
+
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: monolith-servicemonitor
+  namespace: default
+  labels:
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: monolith
+  endpoints:
+    - port: http          # must match the port name in your Service
+      path: /metrics
+      interval: 15s
+      scheme: http
+  namespaceSelector:
+    matchNames:
+      - default
