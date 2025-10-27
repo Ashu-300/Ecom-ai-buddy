@@ -13,3 +13,4 @@
 node_modules
 go.mod
 go.sum
+monitoring-setup-guide.md
