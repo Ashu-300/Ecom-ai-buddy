@@ -1,0 +1,27 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: monolith-alert-rules
+  namespace: default
+  labels:
+    release: prometheus-stack
+spec:
+  groups:
+    - name: monolith-latency
+      rules:
+
+        - alert: MonolithHighLatency
+          expr: |
+            histogram_quantile(
+              0.95,
+              sum(rate(http_request_duration_seconds_bucket[1m]))
+              by (le, service)
+            ) > 0.5
+            AND
+            sum(rate(http_request_duration_seconds_count[1m])) by (service) > 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High latency in {{ $labels.service }}"
+            description: "p95 latency > 500ms for service {{ $labels.service }}"

@@ -1,0 +1,20 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: microservice-scale-down
+  namespace: default
+  labels:
+    release: prometheus-stack
+spec:
+  groups:
+    - name: microservice-scaling
+      rules:
+
+        - alert: ServiceLowTraffic
+          expr: |
+            sum(rate(http_request_duration_seconds_count[2m])) by (service) < 1
+          for: 5m
+          labels:
+            severity: info
+          annotations:
+            summary: "Low traffic on {{ $labels.service }}"
